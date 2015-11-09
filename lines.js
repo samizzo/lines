@@ -1,3 +1,8 @@
+/*
+inspiration: http://fernandojsg.com/project/ksynth/?fx=lines
+do sinewaves too (separately): https://twitter.com/helvetica
+*/
+
 requirejs([], function () {
     var NUM_DOTS = 64;
     var NUM_VERTS = 32;
