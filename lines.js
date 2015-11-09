@@ -1,3 +1,7 @@
+/* global requirejs */
+
+'use strict';
+
 /*
 inspiration: http://fernandojsg.com/project/ksynth/?fx=lines
 do sinewaves too (separately): https://twitter.com/helvetica
@@ -5,18 +9,14 @@ do sinewaves too (separately): https://twitter.com/helvetica
 
 requirejs([], function () {
     var NUM_DOTS = 64;
-    var NUM_VERTS = 32;
-    var RADIUS = 0.2;
 
     var dots;
     var g_canvas, gl;
     var g_image;
-    var g_buffer, g_texCoordBuffer, g_indicesBuffer, g_linesIndicesBuffer;
     var g_dotBuffer, g_dotTexCoordBuffer, g_dotIndicesBuffer;
     var g_positionLocation, g_texCoordLocation;
     var g_texture;
     var g_program, g_lineProgram;
-    var g_vertices, g_texCoords, g_indices, g_linesIndices;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
     var g_translateUniform, g_imageUniform;
 
@@ -73,23 +73,7 @@ requirejs([], function () {
 
             var repaint = false;
 
-            for (var i = 0; i < g_vertices.length; i += 2) {
-                var v = { x: g_vertices[i], y: g_vertices[i+1] };
-                var l = distance(pos, v);
-                if (l < RADIUS) {
-                    var dir = sub(v, pos);
-                    dir = normalise(dir);
-                    if (event.ctrlKey) {
-                        dir = mul(dir, l - RADIUS);
-                    } else {
-                        dir = mul(dir, RADIUS - l);
-                    }
-                    v = add(v, dir);
-                    g_vertices[i] = v.x;
-                    g_vertices[i+1] = v.y;
-                    repaint = true;
-                }
-            }
+            // TODO: Find nearby vertices and push them.
 
             if (repaint) {
                 render();
@@ -109,22 +93,18 @@ requirejs([], function () {
         gl = g_canvas.getContext('webgl', { premultipliedAlpha: false }) || g_canvas.getContext('experimental-webgl', { premultipliedAlpha: false });
 
         // Load the shaders
-        var vertexShader = createShaderFromScriptElement(gl, '2d-vertex-shader');
-        var fragmentShader = createShaderFromScriptElement(gl, '2d-fragment-shader');
-        g_program = createProgram(gl, [ vertexShader, fragmentShader ]);
+        var vertexShader = window.createShaderFromScriptElement(gl, '2d-vertex-shader');
+        var fragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-shader');
+        g_program = window.createProgram(gl, [ vertexShader, fragmentShader ]);
 
-        var lineFragmentShader = createShaderFromScriptElement(gl, '2d-fragment-line-shader');
-        g_lineProgram = createProgram(gl, [ vertexShader, lineFragmentShader ]);
+        var lineFragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-line-shader');
+        g_lineProgram = window.createProgram(gl, [ vertexShader, lineFragmentShader ]);
 
-        g_positionLocation = gl.getAttribLocation(g_program, "a_position");
-        g_texCoordLocation = gl.getAttribLocation(g_program, "a_texCoord");
-        g_translateUniform = gl.getUniformLocation(g_program, "u_translate");
-        g_imageUniform = gl.getUniformLocation(g_program, "u_image");
+        g_positionLocation = gl.getAttribLocation(g_program, 'a_position');
+        g_texCoordLocation = gl.getAttribLocation(g_program, 'a_texCoord');
+        g_translateUniform = gl.getUniformLocation(g_program, 'u_translate');
+        g_imageUniform = gl.getUniformLocation(g_program, 'u_image');
 
-        g_buffer = gl.createBuffer();
-        g_texCoordBuffer = gl.createBuffer();
-        g_indicesBuffer = gl.createBuffer();
-        g_linesIndicesBuffer = gl.createBuffer();
         g_dotBuffer = gl.createBuffer();
         g_dotTexCoordBuffer = gl.createBuffer();
         g_dotIndicesBuffer = gl.createBuffer();
@@ -160,10 +140,6 @@ requirejs([], function () {
         g_dotIndices[2] = 3;
         g_dotIndices[3] = 2;
 
-        var numVerts = NUM_VERTS * NUM_VERTS;
-        g_vertices = new Float32Array(numVerts * 2);
-        g_texCoords = new Float32Array(numVerts * 2);
-
         dots = [];
         for (var i = 0; i < NUM_DOTS; i++) {
             dots[i] = {
@@ -171,69 +147,27 @@ requirejs([], function () {
                 velocity: { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 },
             };
 
-            dots[i].velocity = mul(normalise(dots[i].velocity), 0.05);
+            dots[i].velocity = mul(normalise(dots[i].velocity), 0.1);
         }
-
-        var x, y;
-
-        var vertIndex = 0;
-        for (y = 0; y < NUM_VERTS; y++) {
-            for (x = 0; x < NUM_VERTS; x++) {
-                g_vertices[vertIndex] = ((x / (NUM_VERTS - 1)) * 2) - 1;
-                g_vertices[vertIndex + 1] = ((y / (NUM_VERTS - 1)) * 2) - 1;
-
-                g_texCoords[vertIndex] = (x / (NUM_VERTS - 1));
-                g_texCoords[vertIndex + 1] = 1 - (y / (NUM_VERTS - 1));
-
-                vertIndex += 2;
-            }
-        }
-
-        vertIndex = 0;
-        var numTriangles = ((NUM_VERTS - 1) * (NUM_VERTS - 1)) * 2;
-        g_indices = new Uint16Array(numTriangles * 3);
-
-        var numLines = numTriangles * 2;
-        g_linesIndices = new Uint16Array(numLines * 4);
-
-        var triangleIndex = 0;
-        var lineIndex = 0;
-
-        for (y = 0; y < NUM_VERTS - 1; y++) {
-            for (x = 0; x < NUM_VERTS - 1; x++) {
-                g_indices[triangleIndex] = vertIndex;
-                g_indices[triangleIndex + 1] = vertIndex + 1;
-                g_indices[triangleIndex + 2] = vertIndex + NUM_VERTS;
-
-                g_indices[triangleIndex + 3] = vertIndex + 1;
-                g_indices[triangleIndex + 4] = vertIndex + 1 + NUM_VERTS;
-                g_indices[triangleIndex + 5] = vertIndex + NUM_VERTS;
-
-                g_linesIndices[lineIndex] = vertIndex;
-                g_linesIndices[lineIndex + 1] = vertIndex + 1;
-                g_linesIndices[lineIndex + 2] = vertIndex + 1;
-                g_linesIndices[lineIndex + 3] = vertIndex + 1 + NUM_VERTS;
-                g_linesIndices[lineIndex + 4] = vertIndex + 1 + NUM_VERTS;
-                g_linesIndices[lineIndex + 5] = vertIndex + NUM_VERTS;
-                g_linesIndices[lineIndex + 6] = vertIndex + NUM_VERTS;
-                g_linesIndices[lineIndex + 7] = vertIndex;
-
-                triangleIndex += 6;
-                lineIndex += 8;
-                vertIndex++;
-            }
-
-            vertIndex++;
-        }
-
-        render();
     }
 
     function update(delta) {
         for (var i = 0; i < NUM_DOTS; i++) {
-            var p = dots[i].position;
-            var v = mul(dots[i].velocity, delta);
+            var dot = dots[i];
+            var p = dot.position;
+            var v = mul(dot.velocity, delta);
             p = add(p, v);
+
+            if (p.y < -1 || p.y > 1) {
+                // Off the top or bottom of the screen.
+                dot.velocity.y *= -1;
+                p.y = p.y < -1 ? -1 : 1;
+            } else if (p.x < -1 || p.x > 1) {
+                // Off the left or right of the screen.
+                dot.velocity.x *= -1;
+                p.x = p.x < -1 ? -1 : 1;
+            }
+
             dots[i].position = p;
         }
     }
@@ -247,7 +181,7 @@ requirejs([], function () {
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
         gl.enable(gl.BLEND);
 
-        // Render dot.
+        // Render dots.
         gl.bindBuffer(gl.ARRAY_BUFFER, g_dotBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, g_dotVerts, gl.STATIC_DRAW);
         gl.enableVertexAttribArray(g_positionLocation);
@@ -270,30 +204,6 @@ requirejs([], function () {
             gl.uniform2fv(g_translateUniform, [ p.x, p.y ]);
             gl.drawElements(gl.TRIANGLE_STRIP, g_dotIndices.length, gl.UNSIGNED_SHORT, 0);
         }
-
-        return;
-
-        // ...
-        gl.bindBuffer(gl.ARRAY_BUFFER, g_buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, g_vertices, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(g_positionLocation);
-        gl.vertexAttribPointer(g_positionLocation, 2, gl.FLOAT, false, 0, 0);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, g_texCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, g_texCoords, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(g_texCoordLocation);
-        gl.vertexAttribPointer(g_texCoordLocation, 2, gl.FLOAT, false, 0, 0);
-
-        gl.useProgram(g_program);
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g_indicesBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g_indices, gl.STATIC_DRAW);
-        gl.drawElements(gl.TRIANGLES, g_indices.length, gl.UNSIGNED_SHORT, 0);
-
-        // gl.useProgram(g_lineProgram);
-        // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g_linesIndicesBuffer);
-        // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g_linesIndices, gl.STATIC_DRAW);
-        // gl.drawElements(gl.LINES, g_linesIndices.length, gl.UNSIGNED_SHORT, 0);
     }
 
     (function() {
