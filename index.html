@@ -25,6 +25,16 @@
             }
         </script>
 
+        <script id="2d-vertex-line-shader" type="x-shader/x-vertex">
+            attribute vec2 a_position;
+            uniform vec2 u_translate;
+
+            void main() {
+                vec2 pos = a_position + u_translate;
+                gl_Position = vec4(pos, 0, 1);
+            }
+        </script>
+
         <script id="2d-fragment-line-shader" type="x-shader/x-fragment">
             precision mediump float;
             uniform vec4 u_colour;

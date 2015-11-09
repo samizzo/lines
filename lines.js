@@ -8,7 +8,9 @@ do sinewaves too (separately): https://twitter.com/helvetica
 */
 
 requirejs([], function () {
-    var NUM_DOTS = 64;
+    var NUM_DOTS = 2;
+    var RADIUS = 2;
+    var MAX_LINES = NUM_DOTS * NUM_DOTS;
 
     var dots;
     var g_canvas, gl;
@@ -18,7 +20,9 @@ requirejs([], function () {
     var g_texture;
     var g_program, g_lineProgram;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
-    var g_translateUniform, g_imageUniform;
+    var g_translateUniform, g_imageUniform, colourUniform, lineTranslateUniform, linePositionLocation;
+    var lineBuffer, lineIndicesBuffer;
+    var lineVerts, lineIndices;
 
     var g_mouse = { mouseDown: false, mousePos: { x: 0, y: 0 } };
 
@@ -105,9 +109,16 @@ requirejs([], function () {
         g_translateUniform = gl.getUniformLocation(g_program, 'u_translate');
         g_imageUniform = gl.getUniformLocation(g_program, 'u_image');
 
+        linePositionLocation = gl.getAttribLocation(g_lineProgram, 'a_position');
+        colourUniform = gl.getUniformLocation(g_lineProgram, 'u_colour');
+        lineTranslateUniform = gl.getUniformLocation(g_lineProgram, 'u_translate');
+
         g_dotBuffer = gl.createBuffer();
         g_dotTexCoordBuffer = gl.createBuffer();
         g_dotIndicesBuffer = gl.createBuffer();
+
+        lineBuffer = gl.createBuffer();
+        lineIndicesBuffer = gl.createBuffer();
 
         g_texture = gl.createTexture();
         gl.activeTexture(gl.TEXTURE0);
@@ -140,8 +151,16 @@ requirejs([], function () {
         g_dotIndices[2] = 3;
         g_dotIndices[3] = 2;
 
+        lineVerts = new Float32Array(MAX_LINES * 2 * 2);
+        lineIndices = new Uint16Array(MAX_LINES * 2);
+
+        var i;
+        for (i = 0; i < lineIndices.length; i++) {
+            lineIndices[i] = i;
+        }
+
         dots = [];
-        for (var i = 0; i < NUM_DOTS; i++) {
+        for (i = 0; i < NUM_DOTS; i++) {
             dots[i] = {
                 position: { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 },
                 velocity: { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 },
@@ -199,11 +218,49 @@ requirejs([], function () {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g_dotIndicesBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g_dotIndices, gl.STATIC_DRAW);
 
-        for (var i = 0; i < NUM_DOTS; i++) {
-            var p = dots[i].position;
+        var i, p;
+
+        for (i = 0; i < NUM_DOTS; i++) {
+             p = dots[i].position;
             gl.uniform2fv(g_translateUniform, [ p.x, p.y ]);
             gl.drawElements(gl.TRIANGLE_STRIP, g_dotIndices.length, gl.UNSIGNED_SHORT, 0);
         }
+
+        gl.useProgram(g_lineProgram);
+
+        gl.uniform2fv(lineTranslateUniform, [ 0, 0 ]);
+        gl.uniform4fv(colourUniform, [ 1, 1, 1, 1 ]);
+
+        var numLines = 0;
+        for (i = 0; i < NUM_DOTS; i++) {
+            p = dots[i].position;
+
+            // Find any dots that this dot is near, and draw lines to them.
+            for (var j = 0; j < NUM_DOTS; j++) {
+                if (i === j) {
+                    continue;
+                }
+
+                var pp = dots[j].position;
+                if (distance(p, pp) < RADIUS && numLines < MAX_LINES) {
+                    lineVerts[(numLines * 2 * 2) + 0] = p.x; lineVerts[(numLines * 2 * 2) + 1] = p.y;
+                    lineVerts[(numLines * 2 * 2) + 2] = pp.x; lineVerts[(numLines * 2 * 2) + 3] = pp.y;
+                    numLines++;
+                }
+            }
+        }
+
+        if (numLines === 0) {
+            return;
+        }
+
+        gl.enableVertexAttribArray(linePositionLocation);
+        gl.vertexAttribPointer(linePositionLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, lineVerts, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndicesBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndices, gl.STATIC_DRAW);
+        gl.drawElements(gl.LINES, numLines * 2, gl.UNSIGNED_SHORT, 0);
     }
 
     (function() {
