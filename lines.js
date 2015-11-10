@@ -7,7 +7,7 @@ inspiration: http://fernandojsg.com/project/ksynth/?fx=lines
 do sinewaves too (separately): https://twitter.com/helvetica
 */
 
-requirejs([], function () {
+requirejs(['vec2'], function (vec2) {
     var NUM_DOTS = 64;
     var RADIUS = 0.25;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
@@ -41,32 +41,6 @@ requirejs([], function () {
         if (event.button === 0) {
             g_mouse.mouseDown = false;
         }
-    }
-
-    function distance(a, b) {
-        var delta = { x: b.x - a.x, y: b.y - a.y };
-        return Math.sqrt((delta.x*delta.x) + (delta.y*delta.y));
-    }
-
-    function length(a) {
-        return Math.sqrt((a.x*a.x) + (a.y*a.y));
-    }
-
-    function add(a, b) {
-        return { x: a.x + b.x, y: a.y + b.y };
-    }
-
-    function sub(a, b) {
-        return { x: a.x - b.x, y: a.y - b.y };
-    }
-
-    function mul(a, scalar) {
-        return { x: a.x * scalar, y: a.y * scalar };
-    }
-
-    function normalise(a) {
-        var l = length(a);
-        return mul(a, 1 / l);
     }
 
     function onMouseMove(event) {
@@ -167,7 +141,7 @@ requirejs([], function () {
         for (i = 0; i < NUM_DOTS; i++) {
             var p = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
             var v = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
-            v = mul(normalise(v), 0.1);
+            v = vec2.mul(vec2.normalise(v), 0.1);
             p.x = Math.cos(i);
             p.y = Math.sin(i);
 
@@ -182,8 +156,8 @@ requirejs([], function () {
         for (var i = 0; i < NUM_DOTS; i++) {
             var dot = dots[i];
             var p = dot.position;
-            var v = mul(dot.velocity, delta);
-            p = add(p, v);
+            var v = vec2.mul(dot.velocity, delta);
+            p = vec2.add(p, v);
 
             if (p.y < -1 || p.y > 1) {
                 // Off the top or bottom of the screen.
@@ -249,7 +223,7 @@ requirejs([], function () {
                 }
 
                 var pp = dots[j].position;
-                if (distance(p, pp) < RADIUS && numLines < MAX_LINES) {
+                if (vec2.distance(p, pp) < RADIUS && numLines < MAX_LINES) {
                     lineVerts[(numLines * 2 * 2) + 0] = p.x; lineVerts[(numLines * 2 * 2) + 1] = p.y;
                     lineVerts[(numLines * 2 * 2) + 2] = pp.x; lineVerts[(numLines * 2 * 2) + 3] = pp.y;
                     numLines++;
