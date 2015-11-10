@@ -11,7 +11,7 @@ requirejs([
     'vec2',
     'texture',
 ], function (vec2, Texture) {
-    var NUM_DOTS = 64;
+    var NUM_DOTS = 128;
     var RADIUS = 0.25;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
 
@@ -24,9 +24,10 @@ requirejs([
     var g_positionLocation, g_texCoordLocation;
     var g_program, g_lineProgram;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
-    var g_translateUniform, g_imageUniform, lineTranslateUniform, linePositionLocation;
+    var g_translateUniform, g_imageUniform, lineTranslateUniform, linePositionLocation, lineColsLocation;
     var lineBuffer, lineIndicesBuffer;
     var lineVerts, lineIndices;
+    var lineCols, lineColsBuffer;
 
     var g_mouse = { mouseDown: false, mousePos: { x: 0, y: 0 } };
 
@@ -85,6 +86,7 @@ requirejs([
         g_imageUniform = gl.getUniformLocation(g_program, 'u_image');
 
         linePositionLocation = gl.getAttribLocation(g_lineProgram, 'a_position');
+        lineColsLocation = gl.getAttribLocation(g_lineProgram, 'a_colour');
         lineTranslateUniform = gl.getUniformLocation(g_lineProgram, 'u_translate');
 
         g_dotBuffer = gl.createBuffer();
@@ -92,6 +94,7 @@ requirejs([
         g_dotIndicesBuffer = gl.createBuffer();
 
         lineBuffer = gl.createBuffer();
+        lineColsBuffer = gl.createBuffer();
         lineIndicesBuffer = gl.createBuffer();
 
         // Load the dot texture and leave it bound to texture slot 0.
@@ -116,11 +119,16 @@ requirejs([
         g_dotIndices[3] = 2;
 
         lineVerts = new Float32Array(MAX_LINES * 2 * 2);
+        lineCols = new Float32Array(MAX_LINES * 2 * 4);
         lineIndices = new Uint16Array(MAX_LINES * 2);
 
         var i;
         for (i = 0; i < lineIndices.length; i++) {
             lineIndices[i] = i;
+        }
+
+        for (i = 0; i < lineCols.length; i++) {
+            lineCols[i] = 1;
         }
 
         dots = [];
@@ -209,9 +217,13 @@ requirejs([
                 }
 
                 var pp = dots[j].position;
-                if (vec2.distance(p, pp) < RADIUS && numLines < MAX_LINES) {
+                var dist = vec2.distance(p, pp);
+                if (dist < RADIUS && numLines < MAX_LINES) {
+                    var alpha = 1 - (dist / RADIUS);
                     lineVerts[(numLines * 2 * 2) + 0] = p.x; lineVerts[(numLines * 2 * 2) + 1] = p.y;
+                    lineCols[(numLines * 2 * 4) + 3] = alpha;
                     lineVerts[(numLines * 2 * 2) + 2] = pp.x; lineVerts[(numLines * 2 * 2) + 3] = pp.y;
+                    lineCols[(numLines * 2 * 4) + 7] = alpha;
                     numLines++;
                 }
             }
@@ -223,8 +235,16 @@ requirejs([
 
         gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, lineVerts, gl.STATIC_DRAW);
+
         gl.enableVertexAttribArray(linePositionLocation);
         gl.vertexAttribPointer(linePositionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineColsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, lineCols, gl.STATIC_DRAW);
+
+        gl.enableVertexAttribArray(lineColsLocation);
+        gl.vertexAttribPointer(lineColsLocation, 4, gl.FLOAT, false, 0, 0);
+
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndicesBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndices, gl.STATIC_DRAW);
         gl.drawElements(gl.LINES, numLines * 2, gl.UNSIGNED_SHORT, 0);

@@ -27,9 +27,12 @@
 
         <script id="2d-vertex-line-shader" type="x-shader/x-vertex">
             attribute vec2 a_position;
+            attribute vec4 a_colour;
+            varying vec4 v_colour;
             uniform vec2 u_translate;
 
             void main() {
+                v_colour = a_colour;
                 vec2 pos = a_position + u_translate;
                 gl_Position = vec4(pos, 0, 1);
             }
@@ -37,13 +40,14 @@
 
         <script id="2d-fragment-line-shader" type="x-shader/x-fragment">
             precision mediump float;
+            varying vec4 v_colour;
 
             void main() {
-                gl_FragColor = vec4(1, 1, 1, 1);
+                gl_FragColor = v_colour;
             }
         </script>
     </head>
     <body style="border: 0; padding: 0; margin: 0">
-        <canvas style="border: 0; padding: 0; margin: 0; background: red;" id="canvas" width="512" height="512"></canvas>
+        <canvas style="border: 0; padding: 0; margin: 0; background: red;" id="canvas" width="1024" height="1024"></canvas>
     </body>
 </html>
