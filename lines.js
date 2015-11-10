@@ -7,7 +7,10 @@ inspiration: http://fernandojsg.com/project/ksynth/?fx=lines
 do sinewaves too (separately): https://twitter.com/helvetica
 */
 
-requirejs(['vec2'], function (vec2) {
+requirejs([
+    'vec2',
+    'texture',
+], function (vec2, Texture) {
     var NUM_DOTS = 64;
     var RADIUS = 0.25;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
@@ -16,10 +19,9 @@ requirejs(['vec2'], function (vec2) {
 
     var dots;
     var g_canvas, gl;
-    var g_image;
+    var texture;
     var g_dotBuffer, g_dotTexCoordBuffer, g_dotIndicesBuffer;
     var g_positionLocation, g_texCoordLocation;
-    var g_texture;
     var g_program, g_lineProgram;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
     var g_translateUniform, g_imageUniform, lineTranslateUniform, linePositionLocation;
@@ -27,11 +29,6 @@ requirejs(['vec2'], function (vec2) {
     var lineVerts, lineIndices;
 
     var g_mouse = { mouseDown: false, mousePos: { x: 0, y: 0 } };
-
-    function onImageLoaded() {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, g_image);
-        render();
-    }
 
     function onMouseDown(event) {
         g_mouse.mouseDown = event.button === 0;
@@ -97,19 +94,8 @@ requirejs(['vec2'], function (vec2) {
         lineBuffer = gl.createBuffer();
         lineIndicesBuffer = gl.createBuffer();
 
-        g_texture = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, g_texture);
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        g_image = new Image();
-        g_image.onload = onImageLoaded;
-        g_image.crossOrigin = '';
-        g_image.src = 'dot.png';
+        // Load the dot texture and leave it bound to texture slot 0.
+        texture = new Texture(gl, 'dot.png');
 
         g_dotVerts = new Float32Array(4 * 2);
         g_dotTexCoords = new Float32Array(4 * 2);
