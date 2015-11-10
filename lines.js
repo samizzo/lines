@@ -8,9 +8,11 @@ do sinewaves too (separately): https://twitter.com/helvetica
 */
 
 requirejs([], function () {
-    var NUM_DOTS = 2;
-    var RADIUS = 2;
+    var NUM_DOTS = 64;
+    var RADIUS = 0.25;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
+
+    var aspect = 1;
 
     var dots;
     var g_canvas, gl;
@@ -20,7 +22,7 @@ requirejs([], function () {
     var g_texture;
     var g_program, g_lineProgram;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
-    var g_translateUniform, g_imageUniform, colourUniform, lineTranslateUniform, linePositionLocation;
+    var g_translateUniform, g_imageUniform, lineTranslateUniform, linePositionLocation;
     var lineBuffer, lineIndicesBuffer;
     var lineVerts, lineIndices;
 
@@ -95,14 +97,16 @@ requirejs([], function () {
         }
 
         gl = g_canvas.getContext('webgl', { premultipliedAlpha: false }) || g_canvas.getContext('experimental-webgl', { premultipliedAlpha: false });
+        aspect = g_canvas.height / g_canvas.width;
 
         // Load the shaders
         var vertexShader = window.createShaderFromScriptElement(gl, '2d-vertex-shader');
         var fragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-shader');
         g_program = window.createProgram(gl, [ vertexShader, fragmentShader ]);
 
+        var lineVertexShader = window.createShaderFromScriptElement(gl, '2d-vertex-line-shader');
         var lineFragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-line-shader');
-        g_lineProgram = window.createProgram(gl, [ vertexShader, lineFragmentShader ]);
+        g_lineProgram = window.createProgram(gl, [ lineVertexShader, lineFragmentShader ]);
 
         g_positionLocation = gl.getAttribLocation(g_program, 'a_position');
         g_texCoordLocation = gl.getAttribLocation(g_program, 'a_texCoord');
@@ -110,7 +114,6 @@ requirejs([], function () {
         g_imageUniform = gl.getUniformLocation(g_program, 'u_image');
 
         linePositionLocation = gl.getAttribLocation(g_lineProgram, 'a_position');
-        colourUniform = gl.getUniformLocation(g_lineProgram, 'u_colour');
         lineTranslateUniform = gl.getUniformLocation(g_lineProgram, 'u_translate');
 
         g_dotBuffer = gl.createBuffer();
@@ -138,13 +141,14 @@ requirejs([], function () {
         g_dotTexCoords = new Float32Array(4 * 2);
         g_dotIndices = new Uint16Array(4);
 
-        g_dotVerts[0] = -1 / 64; g_dotVerts[1] = 1 / 64;
+        var dotsize = 64;
+        g_dotVerts[0] = -aspect / dotsize; g_dotVerts[1] = 1 / dotsize;
         g_dotTexCoords[0] = 0; g_dotTexCoords[1] = 0;
-        g_dotVerts[2] = 1 / 64; g_dotVerts[3] = 1 / 64;
+        g_dotVerts[2] = aspect / dotsize; g_dotVerts[3] = 1 / dotsize;
         g_dotTexCoords[2] = 1; g_dotTexCoords[3] = 0;
-        g_dotVerts[4] = 1 / 64; g_dotVerts[5] = -1 / 64;
+        g_dotVerts[4] = aspect / dotsize; g_dotVerts[5] = -1 / dotsize;
         g_dotTexCoords[4] = 1; g_dotTexCoords[5] = 1;
-        g_dotVerts[6] = -1 / 64; g_dotVerts[7] = -1 / 64;
+        g_dotVerts[6] = -aspect / dotsize; g_dotVerts[7] = -1 / dotsize;
         g_dotTexCoords[6] = 0; g_dotTexCoords[7] = 1;
         g_dotIndices[0] = 0;
         g_dotIndices[1] = 1;
@@ -161,12 +165,16 @@ requirejs([], function () {
 
         dots = [];
         for (i = 0; i < NUM_DOTS; i++) {
-            dots[i] = {
-                position: { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 },
-                velocity: { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 },
-            };
+            var p = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
+            var v = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
+            v = mul(normalise(v), 0.1);
+            p.x = Math.cos(i);
+            p.y = Math.sin(i);
 
-            dots[i].velocity = mul(normalise(dots[i].velocity), 0.1);
+            dots[i] = {
+                position: p,
+                velocity: v
+            };
         }
     }
 
@@ -229,7 +237,6 @@ requirejs([], function () {
         gl.useProgram(g_lineProgram);
 
         gl.uniform2fv(lineTranslateUniform, [ 0, 0 ]);
-        gl.uniform4fv(colourUniform, [ 1, 1, 1, 1 ]);
 
         var numLines = 0;
         for (i = 0; i < NUM_DOTS; i++) {
@@ -254,10 +261,10 @@ requirejs([], function () {
             return;
         }
 
-        gl.enableVertexAttribArray(linePositionLocation);
-        gl.vertexAttribPointer(linePositionLocation, 2, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, lineVerts, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(linePositionLocation);
+        gl.vertexAttribPointer(linePositionLocation, 2, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndicesBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndices, gl.STATIC_DRAW);
         gl.drawElements(gl.LINES, numLines * 2, gl.UNSIGNED_SHORT, 0);
