@@ -51,7 +51,13 @@ requirejs([
 
             var repaint = false;
 
-            // TODO: Find nearby vertices and push them.
+            for (var i = 0; i < NUM_DOTS; i++) {
+                var d = dots[i];
+                var dist = vec2.distance(d.position, pos);
+                if (dist < RADIUS) {
+                    d.acceleration = { x: 0.5, y: 0.5 };
+                }
+            }
 
             if (repaint) {
                 render();
@@ -141,7 +147,8 @@ requirejs([
 
             dots[i] = {
                 position: p,
-                velocity: v
+                velocity: v,
+                acceleration: { x: 0, y: 0 }
             };
         }
     }
@@ -150,20 +157,50 @@ requirejs([
         for (var i = 0; i < NUM_DOTS; i++) {
             var dot = dots[i];
             var p = dot.position;
-            var v = vec2.mul(dot.velocity, delta);
-            p = vec2.add(p, v);
+            var v = dot.velocity;
+            var a = dot.acceleration;
+
+            v = vec2.add(v, vec2.mul(a, delta));
+            p = vec2.add(p, vec2.mul(v, delta));
+
+            var damping = delta * 1000;
+            if (a.x > 0) {
+                a.x -= damping;
+                if (a.x < 0) {
+                    a.x = 0;
+                }
+            } else if (a.x < 0) {
+                a.x += damping;
+                if (a.x > 0) {
+                    a.x = 0;
+                }
+            }
+
+            if (a.y > 0) {
+                a.y -= damping;
+                if (a.y < 0) {
+                    a.y = 0;
+                }
+            } else if (a.y < 0) {
+                a.y += damping;
+                if (a.y > 0) {
+                    a.y = 0;
+                }
+            }
 
             if (p.y < -1 || p.y > 1) {
                 // Off the top or bottom of the screen.
-                dot.velocity.y *= -1;
+                v.y *= -1;
                 p.y = p.y < -1 ? -1 : 1;
             } else if (p.x < -1 || p.x > 1) {
                 // Off the left or right of the screen.
-                dot.velocity.x *= -1;
+                v.x *= -1;
                 p.x = p.x < -1 ? -1 : 1;
             }
 
-            dots[i].position = p;
+            dot.position = p;
+            dot.velocity = v;
+            dot.acceleration = a;
         }
     }
 
