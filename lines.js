@@ -11,8 +11,9 @@ requirejs([
     'vec2',
     'texture',
 ], function (vec2, Texture) {
-    var NUM_DOTS = 128;
+    var NUM_DOTS = 256;
     var RADIUS = 0.25;
+    var STRENGTH = 0.1;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
 
     var aspect = 1;
@@ -55,7 +56,9 @@ requirejs([
                 var d = dots[i];
                 var dist = vec2.distance(d.position, pos);
                 if (dist < RADIUS) {
-                    d.acceleration = { x: 0.5, y: 0.5 };
+                    var dir = vec2.sub(d.position, pos);
+                    //d.acceleration = vec2.mul(dir, STRENGTH);
+                    d.velocity = vec2.add(d.velocity, vec2.mul(dir, STRENGTH));
                 }
             }
 
