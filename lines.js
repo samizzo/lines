@@ -2,11 +2,6 @@
 
 'use strict';
 
-/*
-inspiration: http://fernandojsg.com/project/ksynth/?fx=lines
-do sinewaves too (separately): https://twitter.com/helvetica
-*/
-
 requirejs([
     'vec2',
     'texture',
