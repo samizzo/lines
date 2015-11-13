@@ -35,7 +35,8 @@ define(function() {
         add: add,
         sub: sub,
         mul: mul,
-        normalise: normalise
+        normalise: normalise,
+        zero: { x: 0, y: 0 }
     };
     return exports;
 });
