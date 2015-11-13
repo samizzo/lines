@@ -13,7 +13,8 @@ requirejs([
 ], function (vec2, Texture) {
     var NUM_DOTS = 256;
     var RADIUS = 0.25;
-    var STRENGTH = 0.1;
+    var STRENGTH = 0.25;
+    var SPEED = 0.1;
     var MAX_LINES = NUM_DOTS * NUM_DOTS;
 
     var aspect = 1;
@@ -43,27 +44,26 @@ requirejs([
     }
 
     function onMouseMove(event) {
+        g_mouse.clientX = event.clientX;
+        g_mouse.clientY = event.clientY;
+    }
+
+    function processMouse() {
         if (g_mouse.mouseDown) {
             var pos = { x: 0, y: 0 };
-            pos.x = (event.clientX / (g_canvas.width - 1));
-            pos.y = (event.clientY / (g_canvas.height - 1));
+            pos.x = (g_mouse.clientX / (g_canvas.width - 1));
+            pos.y = (g_mouse.clientY / (g_canvas.height - 1));
             pos.x = (pos.x * 2) - 1;
             pos.y = 1 - (pos.y * 2);
-
-            var repaint = false;
 
             for (var i = 0; i < NUM_DOTS; i++) {
                 var d = dots[i];
                 var dist = vec2.distance(d.position, pos);
                 if (dist < RADIUS) {
                     var dir = vec2.sub(d.position, pos);
-                    //d.acceleration = vec2.mul(dir, STRENGTH);
-                    d.velocity = vec2.add(d.velocity, vec2.mul(dir, STRENGTH));
+                    var scale = 1 - (dist / RADIUS);
+                    d.velocity = vec2.add(d.velocity, vec2.mul(dir, STRENGTH * scale));
                 }
-            }
-
-            if (repaint) {
-                render();
             }
         }
     }
@@ -144,52 +144,32 @@ requirejs([
         for (i = 0; i < NUM_DOTS; i++) {
             var p = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
             var v = { x: (Math.random() * 2) - 1, y: (Math.random() * 2) - 1 };
-            v = vec2.mul(vec2.normalise(v), 0.1);
+            v = vec2.mul(vec2.normalise(v), SPEED);
             p.x = Math.cos(i);
             p.y = Math.sin(i);
 
             dots[i] = {
                 position: p,
-                velocity: v,
-                acceleration: { x: 0, y: 0 }
+                velocity: v
             };
         }
     }
 
     function update(delta) {
+        processMouse();
+
         for (var i = 0; i < NUM_DOTS; i++) {
             var dot = dots[i];
             var p = dot.position;
             var v = dot.velocity;
-            var a = dot.acceleration;
 
-            v = vec2.add(v, vec2.mul(a, delta));
             p = vec2.add(p, vec2.mul(v, delta));
 
-            var damping = delta * 1000;
-            if (a.x > 0) {
-                a.x -= damping;
-                if (a.x < 0) {
-                    a.x = 0;
-                }
-            } else if (a.x < 0) {
-                a.x += damping;
-                if (a.x > 0) {
-                    a.x = 0;
-                }
-            }
-
-            if (a.y > 0) {
-                a.y -= damping;
-                if (a.y < 0) {
-                    a.y = 0;
-                }
-            } else if (a.y < 0) {
-                a.y += damping;
-                if (a.y > 0) {
-                    a.y = 0;
-                }
-            }
+            // Dampen velocity until it returns to the original speed.
+            var speed = vec2.length(v);
+            speed = Math.max(speed - (delta * 0.1), SPEED);
+            v = vec2.normalise(v);
+            v = vec2.mul(v, speed);
 
             if (p.y < -1 || p.y > 1) {
                 // Off the top or bottom of the screen.
@@ -203,7 +183,6 @@ requirejs([
 
             dot.position = p;
             dot.velocity = v;
-            dot.acceleration = a;
         }
     }
 
