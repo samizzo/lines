@@ -10,7 +10,8 @@ do sinewaves too (separately): https://twitter.com/helvetica
 requirejs([
     'vec2',
     'texture',
-], function (vec2, Texture) {
+    'shader'
+], function (vec2, Texture, Shader) {
     var NUM_DOTS = 256;
     var RADIUS = 0.25;
     var STRENGTH = 0.25;
@@ -23,10 +24,8 @@ requirejs([
     var g_canvas, gl;
     var texture;
     var g_dotBuffer, g_dotTexCoordBuffer, g_dotIndicesBuffer;
-    var g_positionLocation, g_texCoordLocation;
-    var g_program, g_lineProgram;
+    var dotShader, lineShader;
     var g_dotVerts, g_dotTexCoords, g_dotIndices;
-    var g_translateUniform, g_imageUniform, lineTranslateUniform, linePositionLocation, lineColsLocation;
     var lineBuffer, lineIndicesBuffer;
     var lineVerts, lineIndices;
     var lineCols, lineColsBuffer;
@@ -81,22 +80,14 @@ requirejs([
         aspect = g_canvas.height / g_canvas.width;
 
         // Load the shaders
-        var vertexShader = window.createShaderFromScriptElement(gl, '2d-vertex-shader');
-        var fragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-shader');
-        g_program = window.createProgram(gl, [ vertexShader, fragmentShader ]);
 
-        var lineVertexShader = window.createShaderFromScriptElement(gl, '2d-vertex-line-shader');
-        var lineFragmentShader = window.createShaderFromScriptElement(gl, '2d-fragment-line-shader');
-        g_lineProgram = window.createProgram(gl, [ lineVertexShader, lineFragmentShader ]);
+        dotShader = new Shader(gl, '2d-vertex-shader', '2d-fragment-shader');
+        dotShader.initAttribs([ 'a_position', 'a_texCoord' ]);
+        dotShader.initUniforms([ 'u_translate', 'u_image' ]);
 
-        g_positionLocation = gl.getAttribLocation(g_program, 'a_position');
-        g_texCoordLocation = gl.getAttribLocation(g_program, 'a_texCoord');
-        g_translateUniform = gl.getUniformLocation(g_program, 'u_translate');
-        g_imageUniform = gl.getUniformLocation(g_program, 'u_image');
-
-        linePositionLocation = gl.getAttribLocation(g_lineProgram, 'a_position');
-        lineColsLocation = gl.getAttribLocation(g_lineProgram, 'a_colour');
-        lineTranslateUniform = gl.getUniformLocation(g_lineProgram, 'u_translate');
+        lineShader = new Shader(gl, '2d-vertex-line-shader', '2d-fragment-line-shader');
+        lineShader.initAttribs([ 'a_position', 'a_colour' ]);
+        lineShader.initUniforms([ 'u_translate' ]);
 
         g_dotBuffer = gl.createBuffer();
         g_dotTexCoordBuffer = gl.createBuffer();
@@ -127,6 +118,15 @@ requirejs([
         g_dotIndices[2] = 3;
         g_dotIndices[3] = 2;
 
+        gl.bindBuffer(gl.ARRAY_BUFFER, g_dotBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, g_dotVerts, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, g_dotTexCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, g_dotTexCoords, gl.STATIC_DRAW);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g_dotIndicesBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g_dotIndices, gl.STATIC_DRAW);
+
         lineVerts = new Float32Array(MAX_LINES * 2 * 2);
         lineCols = new Float32Array(MAX_LINES * 2 * 4);
         lineIndices = new Uint16Array(MAX_LINES * 2);
@@ -135,6 +135,9 @@ requirejs([
         for (i = 0; i < lineIndices.length; i++) {
             lineIndices[i] = i;
         }
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndicesBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndices, gl.STATIC_DRAW);
 
         for (i = 0; i < lineCols.length; i++) {
             lineCols[i] = 1;
@@ -195,35 +198,43 @@ requirejs([
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
         gl.enable(gl.BLEND);
 
-        // Render dots.
+        renderDots();
+        renderLines();
+    }
+
+    function renderDots() {
+        var attribs = dotShader.attribs;
+        var uniforms = dotShader.uniforms;
+
+        gl.useProgram(dotShader.program);
+        gl.uniform1i(uniforms.u_image, 0);
+
         gl.bindBuffer(gl.ARRAY_BUFFER, g_dotBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, g_dotVerts, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(g_positionLocation);
-        gl.vertexAttribPointer(g_positionLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs.a_position);
+        gl.vertexAttribPointer(attribs.a_position, 2, gl.FLOAT, false, 0, 0);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, g_dotTexCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, g_dotTexCoords, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(g_texCoordLocation);
-        gl.vertexAttribPointer(g_texCoordLocation, 2, gl.FLOAT, false, 0, 0);
-
-        gl.useProgram(g_program);
-
-        gl.uniform1i(g_imageUniform, 0);
+        gl.enableVertexAttribArray(attribs.a_texCoord);
+        gl.vertexAttribPointer(attribs.a_texCoord, 2, gl.FLOAT, false, 0, 0);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, g_dotIndicesBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, g_dotIndices, gl.STATIC_DRAW);
 
         var i, p;
 
         for (i = 0; i < NUM_DOTS; i++) {
-             p = dots[i].position;
-            gl.uniform2fv(g_translateUniform, [ p.x, p.y ]);
+            p = dots[i].position;
+            gl.uniform2fv(uniforms.u_translate, [ p.x, p.y ]);
             gl.drawElements(gl.TRIANGLE_STRIP, g_dotIndices.length, gl.UNSIGNED_SHORT, 0);
         }
+    }
 
-        gl.useProgram(g_lineProgram);
+    function renderLines() {
+        var i, p;
+        var attribs = lineShader.attribs;
+        var uniforms = lineShader.uniforms;
 
-        gl.uniform2fv(lineTranslateUniform, [ 0, 0 ]);
+        gl.useProgram(lineShader.program);
+        gl.uniform2fv(uniforms.u_translate, [ 0, 0 ]);
 
         var numLines = 0;
         for (i = 0; i < NUM_DOTS; i++) {
@@ -254,18 +265,15 @@ requirejs([
 
         gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, lineVerts, gl.STATIC_DRAW);
-
-        gl.enableVertexAttribArray(linePositionLocation);
-        gl.vertexAttribPointer(linePositionLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs.a_position);
+        gl.vertexAttribPointer(attribs.a_position, 2, gl.FLOAT, false, 0, 0);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, lineColsBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, lineCols, gl.STATIC_DRAW);
-
-        gl.enableVertexAttribArray(lineColsLocation);
-        gl.vertexAttribPointer(lineColsLocation, 4, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(attribs.a_colour);
+        gl.vertexAttribPointer(attribs.a_colour, 4, gl.FLOAT, false, 0, 0);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndicesBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndices, gl.STATIC_DRAW);
         gl.drawElements(gl.LINES, numLines * 2, gl.UNSIGNED_SHORT, 0);
     }
 
