@@ -7,7 +7,7 @@ requirejs([
     'texture',
     'shader'
 ], function (vec2, Texture, Shader) {
-    var NUM_DOTS = 5000;
+    var NUM_DOTS = 512;
     var RADIUS = 0.25;
     var STRENGTH = 0.25;
     var SPEED = 0.1;
